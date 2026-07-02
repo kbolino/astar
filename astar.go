@@ -77,25 +77,35 @@ func NewFinder[Node comparable](g Graph[Node], start, dest Node, d, h CostFunc[N
 	return f
 }
 
+func (f *Finder[Node]) iterate() Path[Node] {
+	p := heap.Pop(&f.pq).(*item[Path[Node]]).value
+	n := p.last()
+	if f.closed.Contains(n) {
+		return nil
+	}
+	if n == f.dest {
+		// Path found
+		return p
+	}
+	f.closed.Add(n)
+
+	for nb := range f.g.Neighbours(n) {
+		cp := p.cont(nb)
+		heap.Push(&f.pq, &item[Path[Node]]{
+			value:    cp,
+			priority: -(cp.Cost(f.d) + f.h(nb, f.dest)),
+		})
+	}
+	return nil
+}
+
 func (f *Finder[Node]) findPath() Path[Node] {
 	for f.pq.Len() > 0 {
-		p := heap.Pop(&f.pq).(*item[Path[Node]]).value
-		n := p.last()
-		if f.closed.Contains(n) {
+		p := f.iterate()
+		if p == nil {
 			continue
-		}
-		if n == f.dest {
-			// Path found
+		} else {
 			return p
-		}
-		f.closed.Add(n)
-
-		for nb := range f.g.Neighbours(n) {
-			cp := p.cont(nb)
-			heap.Push(&f.pq, &item[Path[Node]]{
-				value:    cp,
-				priority: -(cp.Cost(f.d) + f.h(nb, f.dest)),
-			})
 		}
 	}
 	return nil
