@@ -53,15 +53,20 @@ func (p Path[Node]) Cost(d CostFunc[Node]) (c float64) {
 	return c
 }
 
+// Finder uses the A-star algorithm to iteratively find the lowest-cost path.
+//
+// If you want to find the path in a single go, see the FindPath function.
 type Finder[Node comparable] struct {
 	g      Graph[Node]
-	start  Node
-	dest   Node
 	d, h   CostFunc[Node]
 	closed set[Node]
 	pq     priorityQueue[Path[Node]]
+	start  Node
+	dest   Node
 }
 
+// NewFinder creates a new Finder to find the best path from start to dest
+// in g, using the cost function d and cost heuristic function h.
 func NewFinder[Node comparable](g Graph[Node], start, dest Node, d, h CostFunc[Node]) *Finder[Node] {
 	f := &Finder[Node]{
 		g:      g,
@@ -77,15 +82,27 @@ func NewFinder[Node comparable](g Graph[Node], start, dest Node, d, h CostFunc[N
 	return f
 }
 
-func (f *Finder[Node]) iterate() Path[Node] {
+// Iterate advances the search for the path.
+//
+// If done==false, then more work is needed, so path should be ignored
+// and Iterate should be called again.
+// If done==true, then the process is complete, and Iterate should not
+// be called again.
+// Once that happens, path!=nil contains the desired lowest-cost path
+// while path==nil means no such path exists.
+func (f *Finder[Node]) Iterate() (path Path[Node], done bool) {
+	if f.pq.Len() == 0 {
+		// no path exists anymore
+		return nil, true
+	}
 	p := heap.Pop(&f.pq).(*item[Path[Node]]).value
 	n := p.last()
 	if f.closed.Contains(n) {
-		return nil
+		return nil, false
 	}
 	if n == f.dest {
 		// Path found
-		return p
+		return p, true
 	}
 	f.closed.Add(n)
 
@@ -96,24 +113,23 @@ func (f *Finder[Node]) iterate() Path[Node] {
 			priority: -(cp.Cost(f.d) + f.h(nb, f.dest)),
 		})
 	}
-	return nil
+	return nil, false
 }
 
 func (f *Finder[Node]) findPath() Path[Node] {
-	for f.pq.Len() > 0 {
-		p := f.iterate()
-		if p == nil {
-			continue
-		} else {
+	for {
+		if p, done := f.Iterate(); done {
 			return p
 		}
 	}
-	return nil
 }
 
 // FindPath finds the least-cost path between start and dest in graph g
 // using the cost function d and the cost heuristic function h.
 // Returns nil if no path was found.
+//
+// If you want to spread the work of finding a path over multiple iterations,
+// see the Finder type.
 func FindPath[Node comparable](g Graph[Node], start, dest Node, d, h CostFunc[Node]) Path[Node] {
 	return NewFinder(g, start, dest, d, h).findPath()
 }
